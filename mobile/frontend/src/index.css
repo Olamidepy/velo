@@ -1,0 +1,256 @@
+:root {
+  --bg-sage: #EDF1E7;
+  --bg-backdrop: #DCE2D3;
+  --ink-black: #1B2A22;
+  --status-locked: #1B4B8F;
+  --status-released: #1F6B4A;
+  --status-refunded: #8F2A1B;
+  --perforation: #C7D0BE;
+
+  --font-serif: 'IBM Plex Serif', serif;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-backdrop);
+  color: var(--ink-black);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+/* Base styles to make the app fill the screen normally */
+#root {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The Ticket Component Styles */
+.claim-ticket-wrapper {
+  width: 100%;
+  max-width: 360px;
+  background-color: var(--bg-sage);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(27, 42, 34, 0.15), 0 2px 5px rgba(27, 42, 34, 0.1);
+  overflow: hidden;
+  position: relative;
+  /* Slightly rotated for a realistic physical feel when idle, but maybe just straight is cleaner */
+}
+
+/* Top section: QR Code Window */
+.ticket-top {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-window {
+  background-color: #ffffff;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The tear-line divider */
+.ticket-divider {
+  position: relative;
+  height: 20px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ticket-divider::before,
+.ticket-divider::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: var(--bg-backdrop);
+  border-radius: 50%;
+  top: 0;
+  box-shadow: inset 0 2px 5px rgba(27, 42, 34, 0.1);
+}
+
+.ticket-divider::before {
+  left: -10px;
+}
+
+.ticket-divider::after {
+  right: -10px;
+}
+
+.ticket-divider-line {
+  width: 100%;
+  height: 0;
+  border-top: 2px dashed var(--perforation);
+  margin: 0 15px;
+}
+
+/* Bottom section: Details */
+.ticket-bottom {
+  padding: 1.5rem 1.5rem 2rem;
+  position: relative;
+}
+
+.ticket-amount {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.03em;
+}
+
+.ticket-amount-currency {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #5a6660;
+  vertical-align: super;
+  margin-right: 0.2rem;
+}
+
+.ticket-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--perforation);
+  padding-bottom: 0.5rem;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5a6660;
+}
+
+.detail-value {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* The Stamp */
+.status-stamp {
+  position: absolute;
+  top: 10%;
+  right: 5%;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.25rem 0.75rem;
+  border: 3px solid;
+  border-radius: 4px;
+  transform: rotate(-15deg);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.status-locked {
+  color: var(--status-locked);
+  border-color: var(--status-locked);
+}
+
+.status-released {
+  color: var(--status-released);
+  border-color: var(--status-released);
+}
+
+.status-refunded {
+  color: var(--status-refunded);
+  border-color: var(--status-refunded);
+}
+
+.instructions {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #5a6660;
+  line-height: 1.4;
+}
+
+/* State wrappers */
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 3rem;
+  font-family: var(--font-mono);
+}
+
+.error-state {
+  color: var(--status-refunded);
+}
+
+/* Home Page Styles */
+.home-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.home-card {
+  width: 100%;
+  max-width: 360px;
+  background-color: var(--bg-sage);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(27, 42, 34, 0.08);
+  padding: 3rem 2rem;
+  text-align: center;
+  border: 1px solid rgba(27, 42, 34, 0.05);
+}
+
+.home-title {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  color: var(--ink-black);
+  margin-bottom: 0.5rem;
+}
+
+.home-subtitle {
+  font-size: 0.95rem;
+  color: #5a6660;
+  margin-bottom: 2rem;
+  line-height: 1.4;
+}
+
+.home-placeholder {
+  background-color: rgba(255, 255, 255, 0.6);
+  border: 1px dashed var(--perforation);
+  border-radius: 8px;
+  padding: 2rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #7a8a81;
+}
