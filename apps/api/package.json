@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json && mkdir public",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "vitest run --passWithNoTests"
   },
