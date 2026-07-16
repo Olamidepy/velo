@@ -8,10 +8,31 @@ The API is implemented with Fastify and is intended to expose payment-aware rout
 
 ## Routes
 
-- `GET /health` for health checks
-- `GET /api/v1/cash/agents` for provider discovery concepts
-- `POST /api/v1/cash/request` for request creation
-- `GET /api/v1/cash/request/:id` for request status polling
+| Method | Path                          | Price (USDC) | Description                     |
+|--------|-------------------------------|--------------|---------------------------------|
+| GET    | `/health`                     | Free         | Health check                    |
+| GET    | `/api/v1/services`            | Free         | Service catalog                 |
+| GET    | `/api/v1/cash/agents`         | 0.001        | Provider discovery              |
+| POST   | `/api/v1/cash/request`        | 0.01         | Create a cash request           |
+| GET    | `/api/v1/cash/request/:id`    | Free         | Poll request status             |
+| POST   | `/api/v1/cash/request/:id/release` | Free    | Release escrow (hand-off)       |
+| GET    | `/api/v1/reputation/:address` | 0.0005       | On-chain reputation lookup      |
+
+## Rate Limiting
+
+All API endpoints are rate-limited per IP address to prevent abuse. The following limits are enforced:
+
+| Endpoint                             | Limit                 | Reason                           |
+|--------------------------------------|-----------------------|----------------------------------|
+| `GET /health`                        | 100 req / 1 min       | Infrastructure health check      |
+| `GET /api/v1/services`               | 60 req / 1 min        | Free catalog endpoint            |
+| `GET /api/v1/cash/agents`            | 30 req / 1 min        | Paid discovery; limit abuse      |
+| `POST /api/v1/cash/request`          | 20 req / 1 min        | Paid escrow lock (costly)        |
+| `GET /api/v1/cash/request/:id`       | 60 req / 1 min        | Free polling                     |
+| `POST /api/v1/cash/request/:id/release` | 20 req / 1 min     | Free state transition            |
+| `GET /api/v1/reputation/:address`    | 30 req / 1 min        | Paid reputation lookup           |
+
+When a client exceeds the limit, the API responds with `429 Too Many Requests` and a `Retry-After` header indicating the number of seconds to wait before retrying.
 
 ## Payment Gate
 

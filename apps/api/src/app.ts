@@ -1,5 +1,6 @@
  import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import "dotenv/config";
 import { cashRoutes } from "./routes/cash.js";
 import { reputationRoutes } from "./routes/reputation.js";
@@ -19,6 +20,40 @@ app.register(cors, {
     "http://localhost:5181",
     process.env.FRONTEND_BASE_URL ?? "http://localhost:5181",
   ],
+});
+
+/**
+ * Rate limiting — IP-based soft limits applied to all routes.
+ *
+ * Global rate limit:           100 req/min
+ * ------------------------------+-----------------
+ *   GET /health                 | 100 req/min     (infrastructure health check, free)
+ *   GET /api/v1/services        |  60 req/min     (catalog endpoint, free)
+ *   GET /api/v1/cash/agents     |  30 req/min     (paid — agent discovery)
+ *   POST /api/v1/cash/request   |  20 req/min     (paid — escrow lock, costly)
+ *   GET /api/v1/cash/request/:id|  60 req/min     (free — polling)
+ *   POST /api/v1/cash/request/:id/release | 20 req/min (free — state transition)
+ *   GET /api/v1/reputation/:addr|  30 req/min     (paid — on-chain reputation)
+ *
+ * Responses exceeding the limit get a 429 + Retry-After header.
+ *
+ * @fastify/rate-limit uses the requesting IP as the key by default
+ * (trust proxy is enabled but default 0 hops — adjust via
+ * FASTIFY_TRUST_PROXY when deployed behind a reverse proxy).
+ */
+app.register(rateLimit, {
+  global: true,
+  max: 100,
+  timeWindow: "1 minute",
+  errorResponseBuilder: (request, context) => {
+    return {
+      statusCode: 429,
+      error: "Too Many Requests",
+      message: `Rate limit exceeded. You have sent too many requests in ${context.after}. Please wait before retrying.`,
+      retryAfter: context.after, // human-readable, e.g. "1 minute"
+      retryAfterSeconds: Math.ceil(context.ttl / 1000),
+    };
+  },
 });
 
 /**
@@ -93,7 +128,15 @@ app.decorate("requirePayment", async (req: any, reply: any, priceUsdc: string) =
   }
 });
 
-app.get("/health", async () => ({ ok: true }));
+app.get(
+  "/health",
+  {
+    config: {
+      rateLimit: { max: 100, timeWindow: "1 minute" },
+    },
+  },
+  async () => ({ ok: true })
+);
 
 app.register(servicesRoutes, { prefix: "/api/v1" });
 app.register(cashRoutes, { prefix: "/api/v1" });

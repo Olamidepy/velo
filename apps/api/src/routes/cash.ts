@@ -26,7 +26,14 @@ interface CashRequestBody {
  *                                    a discovery/search call)
  */
 export async function cashRoutes(app: FastifyInstance) {
-  app.get("/cash/agents", async (req, reply) => {
+  app.get(
+    "/cash/agents",
+    {
+      config: {
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
     const paid = await (app as any).requirePayment(req, reply, "0.001");
     if (!paid) return;
 
@@ -37,7 +44,14 @@ export async function cashRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post<{ Body: CashRequestBody }>("/cash/request", async (req, reply) => {
+  app.post<{ Body: CashRequestBody }>(
+    "/cash/request",
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
     const paid = await (app as any).requirePayment(req, reply, "0.01");
     if (!paid) return;
 
@@ -89,7 +103,14 @@ export async function cashRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get<{ Params: { id: string } }>("/cash/request/:id", async (req, reply) => {
+  app.get<{ Params: { id: string } }>(
+    "/cash/request/:id",
+    {
+      config: {
+        rateLimit: { max: 60, timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
     const record = getCashRequest(req.params.id);
     if (!record) {
       reply.code(404).send({ error: "request not found" });
@@ -101,6 +122,11 @@ export async function cashRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { id: string }; Body: { secret: string } }>(
     "/cash/request/:id/release",
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: "1 minute" },
+      },
+    },
     async (req, reply) => {
       const record = getCashRequest(req.params.id);
       if (!record) {
