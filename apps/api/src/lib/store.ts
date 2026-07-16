@@ -15,6 +15,8 @@ export interface CashRequestRecord {
     secretHashHex: string;
     status: "locked" | "released" | "refunded";
     createdAt: string;
+    notificationType?: "email" | "sms" | "none";
+    contactInfo?: string;
 }
 
 const store = new Map<string, CashRequestRecord>();

@@ -1,8 +1,9 @@
  import type { FastifyInstance } from "fastify";
 import { CONTRACTS } from "@velo/shared";
-import { lockEscrow, releaseEscrow } from "../lib/stellar.js";
+import { lockEscrow, releaseEscrow, refundEscrow } from "../lib/stellar.js";
 import { randomHex32 } from "../lib/crypto.js";
 import { saveCashRequest, getCashRequest, updateStatus } from "../lib/store.js";
+import { sendNotification } from "../lib/notification.js";
 
 const ESCROW_CONTRACT_ID = process.env.ESCROW_CONTRACT_ID ?? CONTRACTS.testnet.escrow;
 const DEFAULT_TIMEOUT_LEDGERS = 100; // ~15-20 min at Stellar's ~5-6s ledger close time
@@ -12,6 +13,8 @@ interface CashRequestBody {
   buyer: string; // G... address of the person requesting cash
   amount_stroops: string; // bigint as string, e.g. "10000000" = 1 XLM/USDC unit
   secret_hash: string; // 64-character hex string representing SHA256 of the secret
+  notification_type?: "email" | "sms" | "none";
+  contact_info?: string;
 }
 
 /**
@@ -55,10 +58,33 @@ export async function cashRoutes(app: FastifyInstance) {
     const paid = await (app as any).requirePayment(req, reply, "0.01");
     if (!paid) return;
 
-    const { seller, buyer, amount_stroops, secret_hash } = req.body ?? ({} as CashRequestBody);
+    const { seller, buyer, amount_stroops, secret_hash, notification_type, contact_info } = req.body ?? ({} as CashRequestBody);
     if (!seller || !buyer || !amount_stroops || !secret_hash) {
       reply.code(400).send({ error: "seller, buyer, amount_stroops, and secret_hash are required" });
       return;
+    }
+
+    if (notification_type && notification_type !== "none") {
+      if (!contact_info) {
+        reply.code(400).send({ error: "contact_info is required when notification_type is specified" });
+        return;
+      }
+      if (notification_type === "email") {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(contact_info)) {
+          reply.code(400).send({ error: "Invalid email address format for contact_info" });
+          return;
+        }
+      } else if (notification_type === "sms") {
+        const phoneRegex = /^\+?[1-9]\d{5,14}$/;
+        if (!phoneRegex.test(contact_info)) {
+          reply.code(400).send({ error: "Invalid phone number format for contact_info" });
+          return;
+        }
+      } else {
+        reply.code(400).send({ error: "Invalid notification_type. Must be 'email', 'sms', or 'none'" });
+        return;
+      }
     }
 
     const tradeId = randomHex32();
@@ -92,6 +118,8 @@ export async function cashRoutes(app: FastifyInstance) {
       secretHashHex: secret_hash,
       status: "locked",
       createdAt: new Date().toISOString(),
+      notificationType: notification_type,
+      contactInfo: contact_info,
     });
 
     const baseUrl = process.env.FRONTEND_BASE_URL ?? "https://app.velo.cash";
@@ -157,7 +185,43 @@ export async function cashRoutes(app: FastifyInstance) {
       }
 
       updateStatus(record.id, "released");
+      await sendNotification(record, "released");
       return { id: record.id, status: "released" };
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/cash/request/:id/refund",
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
+      const record = getCashRequest(req.params.id);
+      if (!record) {
+        reply.code(404).send({ error: "request not found" });
+        return;
+      }
+      if (record.status !== "locked") {
+        reply.code(409).send({ error: `request is already ${record.status}` });
+        return;
+      }
+
+      try {
+        await refundEscrow({
+          contractId: record.contractId,
+          tradeId: record.id,
+        });
+      } catch (err) {
+        req.log.error(err, "refundEscrow failed");
+        reply.code(502).send({ error: "escrow refund failed", detail: String(err) });
+        return;
+      }
+
+      updateStatus(record.id, "refunded");
+      await sendNotification(record, "refunded");
+      return { id: record.id, status: "refunded" };
     }
   );
 }
