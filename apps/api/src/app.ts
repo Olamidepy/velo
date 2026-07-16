@@ -1,10 +1,11 @@
- import Fastify from "fastify";
+import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import "dotenv/config";
 import { cashRoutes } from "./routes/cash.js";
 import { reputationRoutes } from "./routes/reputation.js";
 import { servicesRoutes } from "./routes/services.js";
+import { providerRoutes } from "./routes/provider.js";
 import { server, NETWORK_PASSPHRASE } from "./lib/stellar.js";
 import { TransactionBuilder, Transaction, FeeBumpTransaction } from "@stellar/stellar-sdk";
 
@@ -137,3 +138,4 @@ app.get(
 app.register(servicesRoutes, { prefix: "/api/v1" });
 app.register(cashRoutes, { prefix: "/api/v1" });
 app.register(reputationRoutes, { prefix: "/api/v1" });
+app.register(providerRoutes, { prefix: "/api/v1" });

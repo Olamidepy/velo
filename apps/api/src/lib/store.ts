@@ -51,3 +51,9 @@ export function updateStatus(id: string, status: CashRequestRecord["status"]) {
     const record = store.get(id);
     if (record) record.status = status;
 }
+
+export function getProviderTrades(sellerAddress: string): CashRequestRecord[] {
+    return Array.from(store.values()).filter(
+        record => record.seller === sellerAddress
+    );
+}
