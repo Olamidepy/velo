@@ -3,6 +3,7 @@ import {
     Keypair,
     Networks,
     Operation,
+    Transaction,
     TransactionBuilder,
     nativeToScVal,
     scValToNative,
@@ -35,6 +36,23 @@ function loadSignerKeypair(): Keypair {
         throw new Error(
             "BUYER_SECRET_KEY not set — see apps/api/.env.example. This is a " +
             "testnet-only signer used until non-custodial signing is wired up."
+        );
+    }
+    return Keypair.fromSecret(secret);
+}
+
+/**
+ * Loads the platform treasury keypair used to sponsor user transactions
+ * via fee-bumps. Defaults to BUYER_SECRET_KEY if SPONSOR_SECRET_KEY is omitted.
+ */
+function loadSponsorKeypair(): Keypair {
+    if (process.env.STELLAR_NETWORK === "PUBLIC") {
+        throw new Error("Custodial sponsor cannot be used on mainnet.");
+    }
+    const secret = process.env.SPONSOR_SECRET_KEY || process.env.BUYER_SECRET_KEY;
+    if (!secret) {
+        throw new Error(
+            "SPONSOR_SECRET_KEY or BUYER_SECRET_KEY not set — see apps/api/.env.example."
         );
     }
     return Keypair.fromSecret(secret);
@@ -80,10 +98,22 @@ async function invokeContract(
         throw new Error(`simulation failed: ${sim.error}`);
     }
 
-    const prepared = assembleTransaction(tx, sim).build();
+    const prepared = assembleTransaction(tx, sim).build() as Transaction;
     prepared.sign(signer);
 
-    const sendResult = await server.sendTransaction(prepared);
+    const sponsor = loadSponsorKeypair();
+    const innerFee = parseInt(prepared.fee, 10);
+    const bumpFee = innerFee + parseInt(BASE_FEE, 10);
+
+    const feeBumpTx = TransactionBuilder.buildFeeBumpTransaction(
+        sponsor,
+        bumpFee.toString(),
+        prepared,
+        NETWORK_PASSPHRASE
+    );
+    feeBumpTx.sign(sponsor);
+
+    const sendResult = await server.sendTransaction(feeBumpTx);
     if (sendResult.status === "ERROR") {
         throw new Error(`submission failed: ${JSON.stringify(sendResult.errorResult)}`);
     }
