@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./index.css";
 import Home from "./pages/Home.js";
 import ClaimQR from "./pages/ClaimQR.js";
+import RegisterProvider from "./pages/RegisterProvider.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -12,6 +13,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/register-provider" element={<RegisterProvider />} />
           {/* Standalone QR page — this is the link the API's cash_request
               endpoint returns, and it must work with no app install and
               no login, since agents (Claude, Telegram, WhatsApp) paste it
