@@ -17,10 +17,30 @@ export interface CashRequestRecord {
     createdAt: string;
 }
 
+export interface ProviderRecord {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    tier: string;
+    rate: string;
+    status: "available" | "unavailable";
+    createdAt: string;
+}
+
 const store = new Map<string, CashRequestRecord>();
+const providersStore = new Map<string, ProviderRecord>();
 
 export function saveCashRequest(record: CashRequestRecord) {
     store.set(record.id, record);
+}
+
+export function saveProvider(record: ProviderRecord) {
+    providersStore.set(record.id, record);
+}
+
+export function getProviders(): ProviderRecord[] {
+    return Array.from(providersStore.values());
 }
 
 export function getCashRequest(id: string): CashRequestRecord | undefined {
@@ -30,4 +50,23 @@ export function getCashRequest(id: string): CashRequestRecord | undefined {
 export function updateStatus(id: string, status: CashRequestRecord["status"]) {
     const record = store.get(id);
     if (record) record.status = status;
+}
+
+export function getProviderTrades(sellerAddress: string): CashRequestRecord[] {
+    return Array.from(store.values()).filter(
+        record => record.seller === sellerAddress
+    );
+}
+
+export function getStoreStats() {
+    const requests = Array.from(store.values());
+    return {
+        total_cash_requests: store.size,
+        total_providers: providersStore.size,
+        cash_requests_by_status: {
+            locked: requests.filter(r => r.status === "locked").length,
+            released: requests.filter(r => r.status === "released").length,
+            refunded: requests.filter(r => r.status === "refunded").length,
+        },
+    };
 }

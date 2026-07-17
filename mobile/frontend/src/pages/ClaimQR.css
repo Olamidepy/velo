@@ -215,3 +215,89 @@
     transform: translateY(0);
   }
 }
+
+.claim-ticket--loading {
+  pointer-events: none;
+}
+
+.claim-ticket__stamp--skeleton {
+  width: 104px;
+  height: 25px;
+  color: transparent;
+  border-color: transparent;
+}
+
+.claim-ticket__qr-box--skeleton {
+  width: 200px;
+  height: 200px;
+  display: grid;
+  place-items: center;
+}
+
+.claim-ticket__skeleton-qr {
+  width: 168px;
+  height: 168px;
+  border-radius: 4px;
+}
+
+.claim-ticket__instruction--skeleton {
+  width: min(260px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.claim-ticket__skeleton-line {
+  display: block;
+  width: 82%;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.claim-ticket__skeleton-line--strong {
+  width: 94%;
+  height: 16px;
+}
+
+.claim-ticket__skeleton-line--short {
+  width: 58%;
+}
+
+.claim-ticket__skeleton-value {
+  display: block;
+  width: 112px;
+  height: 13px;
+  border-radius: 999px;
+}
+
+.claim-ticket__skeleton-value--amount {
+  width: 128px;
+  height: 34px;
+}
+
+.claim-ticket__stamp--skeleton,
+.claim-ticket__skeleton-qr,
+.claim-ticket__skeleton-line,
+.claim-ticket__skeleton-value {
+  background: linear-gradient(90deg, #dfe6d8 25%, #f4f7ef 37%, #dfe6d8 63%);
+  background-size: 400% 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .claim-ticket__stamp--skeleton,
+  .claim-ticket__skeleton-qr,
+  .claim-ticket__skeleton-line,
+  .claim-ticket__skeleton-value {
+    animation: claim-skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes claim-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}

@@ -91,7 +91,7 @@ The mobile experience is intentionally lightweight and QR-centric. It allows a u
 - Node.js 20 or newer
 - npm 10 or newer
 - Rust toolchain
-- wasm target: `wasm32-unknown-unknown`
+- wasm target: `wasm32v1-none`
 - Soroban CLI or Stellar CLI
 - A funded Stellar testnet account
 
@@ -104,6 +104,8 @@ npm install
 cp apps/api/.env.example apps/api/.env
 cp mobile/backend/.env.example mobile/backend/.env
 ```
+
+For the full ordered local setup walkthrough, including the Rust and Soroban prerequisites plus the Windows-specific gotchas, see [docs/development.md](docs/development.md).
 
 ## Local Development
 

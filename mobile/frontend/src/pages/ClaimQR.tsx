@@ -88,8 +88,41 @@ export default function ClaimQR() {
 
   if (!status) {
     return (
-      <div className="claim-page">
-        <p className="claim-page__state">Loading your claim…</p>
+      <div className="claim-page" aria-busy="true" aria-live="polite">
+        <div className="claim-ticket claim-ticket--loading" aria-label="Loading your claim">
+          <div className="claim-ticket__header">
+            <span className="claim-ticket__brand">VELO</span>
+            <span className="claim-ticket__stamp claim-ticket__stamp--skeleton" />
+          </div>
+
+          <div className="claim-ticket__qr-window">
+            <div className="claim-ticket__qr-box claim-ticket__qr-box--skeleton">
+              <span className="claim-ticket__skeleton-qr" />
+            </div>
+            <div className="claim-ticket__instruction claim-ticket__instruction--skeleton">
+              <span className="claim-ticket__skeleton-line claim-ticket__skeleton-line--strong" />
+              <span className="claim-ticket__skeleton-line" />
+              <span className="claim-ticket__skeleton-line claim-ticket__skeleton-line--short" />
+            </div>
+          </div>
+
+          <div className="claim-ticket__perforation" />
+
+          <div className="claim-ticket__details">
+            {["Amount", "Provider", "Claim ID"].map((label, index) => (
+              <div className="claim-ticket__row" key={label}>
+                <span className="claim-ticket__label">{label}</span>
+                <span
+                  className={
+                    index === 0
+                      ? "claim-ticket__skeleton-value claim-ticket__skeleton-value--amount"
+                      : "claim-ticket__skeleton-value"
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
