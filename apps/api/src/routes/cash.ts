@@ -64,15 +64,20 @@ export async function cashRoutes(app: FastifyInstance) {
     const tradeId = randomHex32();
 
     try {
-      await lockEscrow({
-        contractId: ESCROW_CONTRACT_ID,
-        tradeId,
-        seller,
-        buyer,
-        amountStroops: BigInt(amount_stroops),
-        secretHashHex: secret_hash,
-        timeoutLedgers: DEFAULT_TIMEOUT_LEDGERS,
-      });
+      // Pass the request-scoped logger so every escrow lifecycle stage
+      // (simulate → sign → submit → poll) is stamped with this reqId.
+      await lockEscrow(
+        {
+          contractId: ESCROW_CONTRACT_ID,
+          tradeId,
+          seller,
+          buyer,
+          amountStroops: BigInt(amount_stroops),
+          secretHashHex: secret_hash,
+          timeoutLedgers: DEFAULT_TIMEOUT_LEDGERS,
+        },
+        req.log
+      );
     } catch (err) {
       req.log.error(err, "lockEscrow failed");
       reply.code(502).send({
@@ -145,11 +150,14 @@ export async function cashRoutes(app: FastifyInstance) {
       }
 
       try {
-        await releaseEscrow({
-          contractId: record.contractId,
-          tradeId: record.id,
-          secretHex: secret,
-        });
+        await releaseEscrow(
+          {
+            contractId: record.contractId,
+            tradeId: record.id,
+            secretHex: secret,
+          },
+          req.log
+        );
       } catch (err) {
         req.log.error(err, "releaseEscrow failed");
         reply.code(502).send({ error: "escrow release failed", detail: String(err) });

@@ -34,6 +34,15 @@ All API endpoints are rate-limited per IP address to prevent abuse. The followin
 
 When a client exceeds the limit, the API responds with `429 Too Many Requests` and a `Retry-After` header indicating the number of seconds to wait before retrying.
 
+## Request Tracing
+
+Every request is assigned a request ID (inbound `x-request-id` honored,
+Vercel's `x-vercel-id` used as fallback, UUID otherwise) that is echoed
+back in the `x-request-id` response header and attached to every log
+line, including the escrow lifecycle stages (simulate → sign → submit →
+poll). See [Request Tracing](request-tracing.md) for how to trace a
+failed request through Vercel's log viewer.
+
 ## Payment Gate
 
 The current implementation uses an x402-style challenge mechanism. When a valid payment header is not present, the API returns a challenge payload rather than allowing unrestricted access.
