@@ -11,6 +11,7 @@ The API is implemented with Fastify and is intended to expose payment-aware rout
 | Method | Path                          | Price (USDC) | Description                     |
 |--------|-------------------------------|--------------|---------------------------------|
 | GET    | `/health`                     | Free         | Health check                    |
+| GET    | `/api/v1/openapi.json`        | Free         | OpenAPI 3.1 specification       |
 | GET    | `/api/v1/services`            | Free         | Service catalog                 |
 | GET    | `/api/v1/cash/agents`         | 0.001        | Provider discovery              |
 | POST   | `/api/v1/cash/request`        | 0.01         | Create a cash request           |
@@ -25,6 +26,7 @@ All API endpoints are rate-limited per IP address to prevent abuse. The followin
 | Endpoint                             | Limit                 | Reason                           |
 |--------------------------------------|-----------------------|----------------------------------|
 | `GET /health`                        | 100 req / 1 min       | Infrastructure health check      |
+| `GET /api/v1/openapi.json`           | 60 req / 1 min        | Free specification endpoint      |
 | `GET /api/v1/services`               | 60 req / 1 min        | Free catalog endpoint            |
 | `GET /api/v1/cash/agents`            | 30 req / 1 min        | Paid discovery; limit abuse      |
 | `POST /api/v1/cash/request`          | 20 req / 1 min        | Paid escrow lock (costly)        |
