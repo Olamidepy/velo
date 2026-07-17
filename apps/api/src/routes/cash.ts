@@ -193,6 +193,7 @@ export async function cashRoutes(app: FastifyInstance) {
         });
         return;
       }
+      const qrPayload = `velo://claim?request_id=${tradeId}&contract=${ESCROW_CONTRACT_ID}`;
       saveCashRequest({
         id: tradeId,
         contractId: ESCROW_CONTRACT_ID,
@@ -201,6 +202,7 @@ export async function cashRoutes(app: FastifyInstance) {
         amountStroops: amount_stroops,
         secretHex: "", // The API no longer knows the secret
         secretHashHex: secret_hash,
+        qrPayload,
         status: "locked",
         createdAt: new Date().toISOString(),
       });
@@ -209,7 +211,7 @@ export async function cashRoutes(app: FastifyInstance) {
       reply.code(201).send({
         // The secret is held client-side and is NOT returned by the API
         claim_url: `${baseUrl}/claim/${tradeId}`,
-        qr_payload: `velo://claim?request_id=${tradeId}&contract=${ESCROW_CONTRACT_ID}`,
+        qr_payload: qrPayload,
         instructions: "Show this QR to the cash provider to receive your cash.",
       });
     }
