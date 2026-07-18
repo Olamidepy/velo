@@ -13,7 +13,7 @@ export interface CashRequestRecord {
     amountStroops: string; // bigint as string, JSON-safe
     secretHex: string; // TODO: don't store server-side long-term — see note below
     secretHashHex: string;
-    status: "locked" | "released" | "refunded";
+    status: "locked" | "released" | "refunded" | "pending_signature";
     createdAt: string;
 }
 

@@ -1,6 +1,6 @@
  import type { FastifyInstance } from "fastify";
 import { CONTRACTS } from "@velo/shared";
-import { lockEscrow, releaseEscrow } from "../lib/stellar.js";
+import { lockEscrow, releaseEscrow, buildLockEscrowTransaction, submitSignedTransaction } from "../lib/stellar.js";
 import { randomHex32 } from "../lib/crypto.js";
 import { saveCashRequest, getCashRequest, updateStatus } from "../lib/store.js";
 
@@ -12,6 +12,7 @@ interface CashRequestBody {
   buyer: string; // G... address of the person requesting cash
   amount_stroops: string; // bigint as string, e.g. "10000000" = 1 XLM/USDC unit
   secret_hash: string; // 64-character hex string representing SHA256 of the secret
+  mode?: "custodial" | "non_custodial"; // Default: custodial
 }
 
 /**
@@ -55,52 +56,100 @@ export async function cashRoutes(app: FastifyInstance) {
     const paid = await (app as any).requirePayment(req, reply, "0.01");
     if (!paid) return;
 
-    const { seller, buyer, amount_stroops, secret_hash } = req.body ?? ({} as CashRequestBody);
+    const { seller, buyer, amount_stroops, secret_hash, mode = "custodial" } = req.body ?? ({} as CashRequestBody);
     if (!seller || !buyer || !amount_stroops || !secret_hash) {
       reply.code(400).send({ error: "seller, buyer, amount_stroops, and secret_hash are required" });
+      return;
+    }
+    if (mode !== "custodial" && mode !== "non_custodial") {
+      reply.code(400).send({ error: "mode must be either 'custodial' or 'non_custodial'" });
       return;
     }
 
     const tradeId = randomHex32();
 
-    try {
-      await lockEscrow({
+    if (mode === "custodial") {
+      try {
+        await lockEscrow({
+          contractId: ESCROW_CONTRACT_ID,
+          tradeId,
+          seller,
+          buyer,
+          amountStroops: BigInt(amount_stroops),
+          secretHashHex: secret_hash,
+          timeoutLedgers: DEFAULT_TIMEOUT_LEDGERS,
+        });
+      } catch (err) {
+        req.log.error(err, "lockEscrow failed");
+        reply.code(502).send({
+          error: "escrow lock failed",
+          detail: String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+        });
+        return;
+      }
+      saveCashRequest({
+        id: tradeId,
         contractId: ESCROW_CONTRACT_ID,
-        tradeId,
         seller,
         buyer,
-        amountStroops: BigInt(amount_stroops),
+        amountStroops: amount_stroops,
+        secretHex: "",
         secretHashHex: secret_hash,
-        timeoutLedgers: DEFAULT_TIMEOUT_LEDGERS,
+        status: "locked",
+        createdAt: new Date().toISOString(),
       });
-    } catch (err) {
-      req.log.error(err, "lockEscrow failed");
-      reply.code(502).send({
-        error: "escrow lock failed",
-        detail: String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      });
-      return;
-    }
-    saveCashRequest({
-      id: tradeId,
-      contractId: ESCROW_CONTRACT_ID,
-      seller,
-      buyer,
-      amountStroops: amount_stroops,
-      secretHex: "", // The API no longer knows the secret
-      secretHashHex: secret_hash,
-      status: "locked",
-      createdAt: new Date().toISOString(),
-    });
 
-    const baseUrl = process.env.FRONTEND_BASE_URL ?? "https://app.velo.cash";
-    reply.code(201).send({
-      // The secret is held client-side and is NOT returned by the API
-      claim_url: `${baseUrl}/claim/${tradeId}`,
-      qr_payload: `velo://claim?request_id=${tradeId}&contract=${ESCROW_CONTRACT_ID}`,
-      instructions: "Show this QR to the cash provider to receive your cash.",
-    });
+      const baseUrl = process.env.FRONTEND_BASE_URL ?? "https://app.velo.cash";
+      reply.code(201).send({
+        claim_url: `${baseUrl}/claim/${tradeId}`,
+        qr_payload: `velo://claim?request_id=${tradeId}&contract=${ESCROW_CONTRACT_ID}`,
+        instructions: "Show this QR to the cash provider to receive your cash.",
+      });
+    } else {
+      try {
+        const unsignedXdr = await buildLockEscrowTransaction({
+          contractId: ESCROW_CONTRACT_ID,
+          tradeId,
+          seller,
+          buyer,
+          amountStroops: BigInt(amount_stroops),
+          secretHashHex: secret_hash,
+          timeoutLedgers: DEFAULT_TIMEOUT_LEDGERS,
+          signerPublicKey: buyer,
+        });
+        saveCashRequest({
+          id: tradeId,
+          contractId: ESCROW_CONTRACT_ID,
+          seller,
+          buyer,
+          amountStroops: amount_stroops,
+          secretHex: "",
+          secretHashHex: secret_hash,
+          status: "pending_signature",
+          createdAt: new Date().toISOString(),
+        });
+
+        const baseUrl = process.env.FRONTEND_BASE_URL ?? "https://app.velo.cash";
+        reply.code(201).send({
+          request_id: tradeId,
+          unsigned_xdr: unsignedXdr,
+          network_passphrase: process.env.STELLAR_NETWORK === "PUBLIC" ? "Public Global Stellar Network ; September 2015" : "Test SDF Network ; September 2015",
+          submit_url: `/api/v1/cash/request/${tradeId}/submit`,
+          claim_url: `${baseUrl}/claim/${tradeId}`,
+          qr_payload: `velo://claim?request_id=${tradeId}&contract=${ESCROW_CONTRACT_ID}`,
+          instructions: "Sign the transaction with your wallet and submit to the provided endpoint.",
+        });
+      } catch (err) {
+        req.log.error(err, "buildLockEscrowTransaction failed");
+        reply.code(502).send({
+          error: "failed to build transaction",
+          detail: String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+        });
+        return;
+      }
+    }
   });
 
   app.get<{ Params: { id: string } }>(
@@ -158,6 +207,51 @@ export async function cashRoutes(app: FastifyInstance) {
 
       updateStatus(record.id, "released");
       return { id: record.id, status: "released" };
+    }
+  );
+
+  app.post<{ Params: { id: string }; Body: { signed_xdr: string } }>(
+    "/cash/request/:id/submit",
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: "1 minute" },
+      },
+    },
+    async (req, reply) => {
+      const record = getCashRequest(req.params.id);
+      if (!record) {
+        reply.code(404).send({ error: "request not found" });
+        return;
+      }
+      if (record.status !== "pending_signature") {
+        reply.code(409).send({ error: `request is in status ${record.status}, expected pending_signature` });
+        return;
+      }
+
+      const { signed_xdr } = req.body ?? {};
+      if (!signed_xdr) {
+        reply.code(400).send({ error: "signed_xdr is required" });
+        return;
+      }
+
+      try {
+        const result = await submitSignedTransaction(signed_xdr);
+        updateStatus(record.id, "locked");
+        
+        const baseUrl = process.env.FRONTEND_BASE_URL ?? "https://app.velo.cash";
+        reply.code(200).send({
+          id: record.id,
+          status: "locked",
+          transaction_hash: result.hash,
+          claim_url: `${baseUrl}/claim/${record.id}`,
+          qr_payload: `velo://claim?request_id=${record.id}&contract=${record.contractId}`,
+          instructions: "Show this QR to the cash provider to receive your cash.",
+        });
+      } catch (err) {
+        req.log.error(err, "submitSignedTransaction failed");
+        reply.code(502).send({ error: "transaction submission failed", detail: String(err) });
+        return;
+      }
     }
   );
 }
