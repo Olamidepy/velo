@@ -237,13 +237,13 @@ mod test {
         let buyer = Address::generate(&env);
         let seller = Address::generate(&env);
         let client = EscrowContractClient::new(&env, &env.register_contract(None, EscrowContract));
-        
+
         client.initialize(&admin, &token, &100);
-        
+
         let id = BytesN::from_array(&env, &[1u8; 32]);
         let secret = BytesN::from_array(&env, &[7u8; 32]);
         let secret_hash = env.crypto().sha256(&secret.into()).to_bytes();
-        
+
         // Large amount that exceeds i128::MAX / 10_000
         let overflow_amount = (i128::MAX / 10_000) + 1;
         client.lock(&id, &seller, &buyer, &overflow_amount, &secret_hash, &100);
