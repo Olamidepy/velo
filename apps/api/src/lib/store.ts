@@ -22,6 +22,8 @@ export interface CashRequestRecord {
     resolvedAt?: string;
     resolvedBy?: string;
     resolution?: string;
+    notificationType?: "email" | "sms" | "none";
+    contactInfo?: string;
 }
 
 export interface ProviderRecord {
