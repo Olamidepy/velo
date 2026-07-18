@@ -14,8 +14,14 @@ export interface CashRequestRecord {
     secretHex: string; // TODO: don't store server-side long-term — see note below
     secretHashHex: string;
     qrPayload: string; // safe to persist — contains no secret, only request_id + contract
-    status: "locked" | "released" | "refunded";
+    status: "locked" | "released" | "refunded" | "disputed";
     createdAt: string;
+    disputedAt?: string;
+    disputedBy?: string;
+    disputeReason?: string;
+    resolvedAt?: string;
+    resolvedBy?: string;
+    resolution?: string;
 }
 
 export interface ProviderRecord {
@@ -68,6 +74,7 @@ export function getStoreStats() {
             locked: requests.filter(r => r.status === "locked").length,
             released: requests.filter(r => r.status === "released").length,
             refunded: requests.filter(r => r.status === "refunded").length,
+            disputed: requests.filter(r => r.status === "disputed").length,
         },
     };
 }

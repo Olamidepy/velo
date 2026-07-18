@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { refundEscrow } from "../lib/stellar.js"; // Assuming stellar.ts exports refundEscrow
+import { refundEscrow, resolveEscrow } from "../lib/stellar.js"; // Assuming stellar.ts exports refundEscrow
 import { getCashRequest, updateStatus } from "../lib/store.js";
 
 // Basic schema for body validation
@@ -184,6 +184,97 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.status(500).send({ 
           error: "Refund successful on-chain, but local database status sync failed. Manual sync needed.",
           trade_id: id
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /admin/trades/:id/resolve
+   * Acceptance Criteria: Resolve a disputed trade.
+   */
+  app.post<{ Params: { id: string }; Body: { resolve_to_buyer: boolean; notes?: string } }>(
+    "/admin/trades/:id/resolve",
+    async (req, reply) => {
+      const { id } = req.params;
+      const { resolve_to_buyer, notes } = req.body ?? {};
+      const operatorName = req.headers["x-admin-operator-name"] || "System Admin";
+
+      if (typeof resolve_to_buyer !== "boolean") {
+        return reply.status(400).send({ error: "Field 'resolve_to_buyer' (boolean) is required." });
+      }
+
+      // 1. Check local state store for validity
+      const record = getCashRequest(id);
+      if (!record) {
+        return reply.status(404).send({ error: "Trade request not found." });
+      }
+
+      if (record.status !== "disputed") {
+        return reply.status(400).send({
+          error: `Cannot resolve. Only disputed trades can be resolved. Current status is '${record.status}'.`
+        });
+      }
+
+      // 2. Perform on-chain resolution via Soroban contract calling resolve
+      try {
+        req.log.warn(`Admin resolution initiated on-chain for trade ID ${id} (resolve_to_buyer: ${resolve_to_buyer}) by ${operatorName}`);
+        
+        await resolveEscrow({
+          contractId: record.contractId,
+          tradeId: record.id,
+          resolveToBuyer: resolve_to_buyer,
+        });
+
+      } catch (err) {
+        req.log.error(err, "resolveEscrow on-chain call failed");
+        return reply.status(502).send({
+          error: "On-chain resolve execution failed",
+          detail: String(err)
+        });
+      }
+
+      const newStatus = resolve_to_buyer ? "refunded" : "released";
+
+      // 3. Keep DB audit trail clean & up-to-date
+      try {
+        const query = `
+          UPDATE cash_requests
+          SET 
+            status = $1,
+            resolved_at = NOW(),
+            resolved_by = $2,
+            resolution = $3,
+            updated_at = NOW()
+          WHERE id = $4;
+        `;
+        await (app as any).pg.query(query, [newStatus, operatorName, notes || null, id]);
+        
+        // Keep memory/store helper synced
+        updateStatus(id, newStatus);
+        record.resolvedAt = new Date().toISOString();
+        record.resolvedBy = String(operatorName);
+        record.resolution = notes || "";
+
+        return reply.status(200).send({
+          status: "success",
+          message: "Dispute resolved successfully.",
+          trade_id: id,
+          new_status: newStatus
+        });
+
+      } catch (dbErr) {
+        req.log.error(dbErr, "On-chain transaction succeeded, but internal database sync failed");
+        // Keep memory/store helper synced in memory anyway
+        updateStatus(id, newStatus);
+        record.resolvedAt = new Date().toISOString();
+        record.resolvedBy = String(operatorName);
+        record.resolution = notes || "";
+        
+        return reply.status(500).send({
+          error: "Resolution successful on-chain, but local database status sync failed. Manual sync needed.",
+          trade_id: id,
+          new_status: newStatus
         });
       }
     }
