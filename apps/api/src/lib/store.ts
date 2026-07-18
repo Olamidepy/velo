@@ -56,6 +56,10 @@ export function getCashRequest(id: string): CashRequestRecord | undefined {
     return store.get(id);
 }
 
+export function getAllCashRequests(): CashRequestRecord[] {
+    return Array.from(store.values());
+}
+
 export function updateStatus(id: string, status: CashRequestRecord["status"]) {
     const record = store.get(id);
     if (record) record.status = status;

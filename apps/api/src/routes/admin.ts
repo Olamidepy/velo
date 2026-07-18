@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { refundEscrow, resolveEscrow } from "../lib/stellar.js"; // Assuming stellar.ts exports refundEscrow
-import { getCashRequest, updateStatus } from "../lib/store.js";
+import { getCashRequest, updateStatus, getAllCashRequests } from "../lib/store.js";
 
 // Basic schema for body validation
 interface FlagRequestBody {
@@ -56,8 +56,26 @@ export async function adminRoutes(app: FastifyInstance) {
           LIMIT 100;
         `;
         
-        // --- ADAPT TO YOUR DB CLIENT ---
-        const { rows: trades } = await (app as any).pg.query(query);
+        let trades;
+        if ((app as any).pg) {
+          // --- ADAPT TO YOUR DB CLIENT ---
+          const { rows } = await (app as any).pg.query(query);
+          trades = rows;
+        } else {
+          // Fallback to in-memory store
+          trades = getAllCashRequests().map(r => ({
+            id: r.id,
+            seller_address: r.seller,
+            buyer_address: r.buyer,
+            amount_stroops: r.amountStroops,
+            status: r.status,
+            is_suspicious: (r as any).isSuspicious ?? false,
+            suspicion_notes: (r as any).suspicionNotes ?? null,
+            flagged_at: (r as any).flaggedAt ?? null,
+            created_at: r.createdAt,
+            updated_at: r.createdAt, // Fallback
+          }));
+        }
         // --------------------------------
 
         return reply.status(200).send({
@@ -87,28 +105,43 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       try {
-        const query = `
-          UPDATE cash_requests
-          SET 
-            is_suspicious = $1,
-            suspicion_notes = $2,
-            flagged_at = CASE WHEN $1 = TRUE THEN NOW() ELSE NULL END,
-            updated_at = NOW()
-          WHERE id = $3
-          RETURNING id, is_suspicious, suspicion_notes, flagged_at;
-        `;
-        
-        const { rows, rowCount } = await (app as any).pg.query(query, [suspicious, notes || null, id]);
+        if ((app as any).pg) {
+          const query = `
+            UPDATE cash_requests
+            SET 
+              is_suspicious = $1,
+              suspicion_notes = $2,
+              flagged_at = CASE WHEN $1 = TRUE THEN NOW() ELSE NULL END,
+              updated_at = NOW()
+            WHERE id = $3
+            RETURNING id, is_suspicious, suspicion_notes, flagged_at;
+          `;
+          
+          const { rows, rowCount } = await (app as any).pg.query(query, [suspicious, notes || null, id]);
 
-        if (rowCount === 0) {
-          return reply.status(404).send({ error: "Trade request not found." });
+          if (rowCount === 0) {
+            return reply.status(404).send({ error: "Trade request not found." });
+          }
+
+          return reply.status(200).send({
+            status: "success",
+            message: suspicious ? "Trade flagged as suspicious." : "Trade suspicion flag removed.",
+            data: rows[0]
+          });
+        } else {
+          // Fallback when pg is not defined (e.g. testing)
+          const record = getCashRequest(id);
+          if (!record) {
+            return reply.status(404).send({ error: "Trade request not found." });
+          }
+          (record as any).isSuspicious = suspicious;
+          (record as any).suspicionNotes = notes || null;
+          return reply.status(200).send({
+            status: "success",
+            message: suspicious ? "Trade flagged as suspicious." : "Trade suspicion flag removed.",
+            data: { id, is_suspicious: suspicious, suspicion_notes: notes || null, flagged_at: suspicious ? new Date().toISOString() : null }
+          });
         }
-
-        return reply.status(200).send({
-          status: "success",
-          message: suspicious ? "Trade flagged as suspicious." : "Trade suspicion flag removed.",
-          data: rows[0]
-        });
       } catch (error) {
         req.log.error(error, `Failed to flag trade ${id}`);
         return reply.status(500).send({ error: "Could not update trade flag status." });
@@ -158,16 +191,18 @@ export async function adminRoutes(app: FastifyInstance) {
 
       // 3. Keep DB audit trail clean & up-to-date
       try {
-        const query = `
-          UPDATE cash_requests
-          SET 
-            status = 'refunded',
-            admin_override_by = $1,
-            admin_override_at = NOW(),
-            updated_at = NOW()
-          WHERE id = $2;
-        `;
-        await (app as any).pg.query(query, [operatorName, id]);
+        if ((app as any).pg) {
+          const query = `
+            UPDATE cash_requests
+            SET 
+              status = 'refunded',
+              admin_override_by = $1,
+              admin_override_at = NOW(),
+              updated_at = NOW()
+            WHERE id = $2;
+          `;
+          await (app as any).pg.query(query, [operatorName, id]);
+        }
         
         // Keep memory/store helper synced 
         updateStatus(id, "refunded");
@@ -238,17 +273,19 @@ export async function adminRoutes(app: FastifyInstance) {
 
       // 3. Keep DB audit trail clean & up-to-date
       try {
-        const query = `
-          UPDATE cash_requests
-          SET 
-            status = $1,
-            resolved_at = NOW(),
-            resolved_by = $2,
-            resolution = $3,
-            updated_at = NOW()
-          WHERE id = $4;
-        `;
-        await (app as any).pg.query(query, [newStatus, operatorName, notes || null, id]);
+        if ((app as any).pg) {
+          const query = `
+            UPDATE cash_requests
+            SET 
+              status = $1,
+              resolved_at = NOW(),
+              resolved_by = $2,
+              resolution = $3,
+              updated_at = NOW()
+            WHERE id = $4;
+          `;
+          await (app as any).pg.query(query, [newStatus, operatorName, notes || null, id]);
+        }
         
         // Keep memory/store helper synced
         updateStatus(id, newStatus);
