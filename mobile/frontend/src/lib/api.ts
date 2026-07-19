@@ -31,27 +31,17 @@ export async function releaseCashRequest(id: string, secret: string): Promise<vo
   }
 }
 
-export interface StatusResponse {
-  api: { status: string; uptime_seconds: number; timestamp: string };
-  chain: {
-    network: string;
-    status: string;
-    latest_ledger: number | null;
-    oldest_ledger: number | null;
-  };
-  recent_activity: Array<{
-    id: string;
-    status: "locked" | "released" | "refunded";
-    createdAt: string;
-  }>;
+export interface ChatMessage {
+  id: string;
+  tradeId: string;
+  sender: string;
+  text: string;
+  createdAt: string;
 }
 
-/** Public transparency data: API/chain health + recent (sanitized) activity. */
-export async function fetchStatus(): Promise<StatusResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/status`);
-  if (!res.ok) {
-    throw new Error(`status request failed (${res.status})`);
-  }
+export async function fetchChatHistory(tradeId: string, participant: string): Promise<{ messages: ChatMessage[] }> {
+  const res = await fetch(`${API_BASE}/api/v1/chat/${tradeId}/history?participant=${encodeURIComponent(participant)}`);
+  if (!res.ok) throw new Error("chat history failed");
   return res.json();
 }
 

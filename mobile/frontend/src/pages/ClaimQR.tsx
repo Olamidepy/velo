@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import {
   fetchCashRequest,
   releaseCashRequest,
@@ -237,6 +237,25 @@ export default function ClaimQR() {
             </span>
           </div>
         </div>
+
+        {status.status === "locked" && (
+          <div className="claim-ticket__actions">
+            <a
+              href={`/chat/${status.id}?participant=${encodeURIComponent(status.buyer)}`}
+              className="claim-ticket__chat-link"
+              onClick={(e) => {
+                e.preventDefault();
+                window.open(
+                  `/chat/${status.id}?participant=${encodeURIComponent(status.buyer)}`,
+                  "chat",
+                  "width=460,height=700"
+                );
+              }}
+            >
+              Chat with provider
+            </a>
+          </div>
+        )}
 
         {status.status === 'locked' && secret && (
           <details className="claim-ticket__debug">

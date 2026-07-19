@@ -1,8 +1,10 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import websocket from "@fastify/websocket";
 import "dotenv/config";
 import { cashRoutes } from "./routes/cash.js";
+import { chatRoutes } from "./routes/chat.js";
 import { openapiRoutes } from "./routes/openapi.js";
 import { reputationRoutes } from "./routes/reputation.js";
 import { servicesRoutes } from "./routes/services.js";
@@ -46,6 +48,8 @@ app.register(cors, {
  * (trust proxy is enabled but default 0 hops — adjust via
  * FASTIFY_TRUST_PROXY when deployed behind a reverse proxy).
  */
+app.register(websocket);
+
 app.register(rateLimit, {
   global: true,
   max: 100,
@@ -142,6 +146,7 @@ app.get(
 app.register(openapiRoutes, { prefix: "/api/v1" });
 app.register(servicesRoutes, { prefix: "/api/v1" });
 app.register(cashRoutes, { prefix: "/api/v1" });
+app.register(chatRoutes, { prefix: "/api/v1" });
 app.register(reputationRoutes, { prefix: "/api/v1" });
 app.register(providerRoutes, { prefix: "/api/v1" });
 app.register(adminRoutes, { prefix: "/api/v1" });

@@ -181,10 +181,26 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="mt-2 sm:flex sm:justify-between">
-                      <div className="sm:flex">
+                      <div className="sm:flex sm:items-center sm:gap-4">
                         <p className="flex items-center text-sm text-gray-500 font-mono">
                           Buyer: {trade.buyer.substring(0, 8)}...
                         </p>
+                        {trade.status === "locked" && (
+                          <a
+                            href={`/chat/${trade.id}?participant=${encodeURIComponent(data?.address ?? "")}`}
+                            className="text-sm text-blue-600 hover:text-blue-800 underline"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              window.open(
+                                `/chat/${trade.id}?participant=${encodeURIComponent(data?.address ?? "")}`,
+                                "_blank",
+                                "width=460,height=700"
+                              );
+                            }}
+                          >
+                            Chat
+                          </a>
+                        )}
                       </div>
                       <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
                         <p>

@@ -206,6 +206,30 @@ html.dark {
   color: var(--stamp-red);
 }
 
+.claim-ticket__actions {
+  padding: 0 24px 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.claim-ticket__chat-link {
+  display: inline-block;
+  padding: 10px 24px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--card, #f7f9f4);
+  background: var(--ink, #1b2a22);
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.claim-ticket__chat-link:hover {
+  opacity: 0.85;
+}
+
 .claim-ticket__debug {
   margin: 0 24px 24px;
   padding-top: 16px;
