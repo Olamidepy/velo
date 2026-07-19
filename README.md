@@ -38,6 +38,8 @@ The system is organized around a simple trust model:
 - the API layer exposes the flow to clients and agents,
 - the mobile experience provides a lightweight path for users to complete or claim transactions.
 
+For a detailed step-by-step visual sequence of the end-to-end payment and cash request flow, see the [End-to-End Request Flow Diagram](docs/request-flow.md).
+
 ```mermaid
 flowchart LR
   User[User / Mobile Client] --> Frontend[Mobile Frontend]
@@ -159,6 +161,7 @@ docs/                contributor and architecture documentation
 
 ## Documentation Links
 
+- [docs/request-flow.md](docs/request-flow.md) (End-to-End Request Flow Diagram)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/smart-contracts.md](docs/smart-contracts.md)
 - [docs/api.md](docs/api.md)
