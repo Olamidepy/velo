@@ -49,12 +49,12 @@ export default function MerchantScan() {
           { facingMode: "environment" },
           {
             fps: 10,
-            qrbox: (width, height) => {
+            qrbox: (width: number, height: number) => {
               const size = Math.min(width, height) * 0.7;
               return { width: size, height: size };
             },
           },
-          async (decodedText) => {
+          async (decodedText: string) => {
             try {
               // Parse the QR payload
               // format: velo://claim?request_id=xxx&secret=yyy or http://.../claim/xxx?secret=yyy
@@ -93,14 +93,14 @@ export default function MerchantScan() {
             // silent fail on non-detected frame
           }
         )
-        .catch((err) => {
-          setError(`Camera access error: ${err instanceof Error ? err.message : err}`);
+        .catch((err: unknown) => {
+          setError(`Camera access error: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
 
     return () => {
       if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch((e) => console.error("Error stopping scanner", e));
+        scannerRef.current.stop().catch((e: unknown) => console.error("Error stopping scanner", e));
       }
     };
   }, [scanning, scannedData]);

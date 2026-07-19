@@ -6,6 +6,7 @@ import Home from "./pages/Home.js";
 import ClaimQR from "./pages/ClaimQR.js";
 import RegisterProvider from "./pages/RegisterProvider.js";
 import Dashboard from "./pages/Dashboard.js";
+import Status from "./pages/Status.js";
 import Chat from "./pages/Chat.js";
 import MerchantScan from "./pages/MerchantScan.js";
 import Status from "./pages/Status.js";

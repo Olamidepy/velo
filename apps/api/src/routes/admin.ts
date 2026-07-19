@@ -12,6 +12,25 @@ interface OverrideHeader {
   'x-admin-api-key': string;
 }
 
+// Basic schema for body validation
+interface FlagRequestBody {
+  suspicious: boolean;
+  notes?: string;
+}
+
+interface OverrideHeader {
+  'x-admin-api-key': string;
+}
+
+// Basic schema for body validation
+interface FlagRequestBody {
+  suspicious: boolean;
+  notes?: string;
+}
+
+interface OverrideHeader {
+  'x-admin-api-key': string;
+}
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook("preHandler", async (req: FastifyRequest, reply: FastifyReply) => {
     const adminKey = req.headers["x-admin-api-key"];

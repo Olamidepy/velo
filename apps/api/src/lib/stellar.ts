@@ -11,6 +11,18 @@ import {
 } from "@stellar/stellar-sdk";
 import { Server, Api, assembleTransaction } from "@stellar/stellar-sdk/rpc";
 
+export interface StellarLogger {
+    info: (obj: Record<string, unknown>, msg?: string) => void;
+    error: (obj: Record<string, unknown>, msg?: string) => void;
+    child: (bindings: Record<string, unknown>) => StellarLogger;
+}
+
+const noopLogger: StellarLogger = {
+    info: () => {},
+    error: () => {},
+    child: () => noopLogger,
+};
+
 const RPC_URL = process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org";
 const IS_PUBLIC = process.env.STELLAR_NETWORK === "PUBLIC";
 const RPC_ALLOW_HTTP = RPC_URL.startsWith("http://");
@@ -143,8 +155,9 @@ async function invokeContract(
     functionName: string,
     args: xdr.ScVal[],
     signer: Keypair,
+    logger: StellarLogger = noopLogger,
 ): Promise<unknown> {
-    const stageLog = log.child({ contract: contractId, fn: functionName });
+    const stageLog = logger.child({ contract: contractId, fn: functionName });
 
     stageLog.info({ stage: "build", signer: signer.publicKey() }, "building contract invocation");
     const account = await server.getAccount(signer.publicKey());
@@ -265,7 +278,7 @@ export async function submitLockTx(signedXdr: string): Promise<{ hash: string }>
 }
 
 /** Testnet-only: custodial lock (API signs with BUYER_SECRET_KEY). */
-export async function lockEscrow(params: LockParams) {
+export async function lockEscrow(params: LockParams, logger: StellarLogger = noopLogger) {
     const signer = loadSignerKeypair();
     return invokeContract(
         params.contractId,
@@ -279,6 +292,7 @@ export async function lockEscrow(params: LockParams) {
             nativeToScVal(params.timeoutLedgers, { type: "u32" }),
         ],
         signer,
+        logger,
     );
 }
 
