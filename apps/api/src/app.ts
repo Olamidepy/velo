@@ -183,6 +183,19 @@ app.get(
   async () => ({ ok: true })
 );
 
+app.get(
+  "/version",
+  {
+    config: {
+      rateLimit: { max: 100, timeWindow: "1 minute" },
+    },
+  },
+  async () => ({
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || "unknown",
+    timestamp: process.env.DEPLOY_TIMESTAMP || "unknown",
+  })
+);
+
 app.register(openapiRoutes, { prefix: "/api/v1" });
 app.register(servicesRoutes, { prefix: "/api/v1" });
 app.register(cashRoutes, { prefix: "/api/v1" });
