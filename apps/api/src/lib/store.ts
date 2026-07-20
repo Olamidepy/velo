@@ -15,6 +15,7 @@ export interface CashRequestRecord {
     secretHashHex: string;
     qrPayload: string; // safe to persist — contains no secret, only request_id + contract
     status: "locked" | "released" | "refunded" | "disputed";
+    status: "locked" | "released" | "refunded" | "pending_signature";
     createdAt: string;
     disputedAt?: string;
     disputedBy?: string;
@@ -31,9 +32,12 @@ export interface ProviderRecord {
     name: string;
     lat: number;
     lng: number;
-    tier: string;
+    tier: "Probationary" | "Standard" | "Trusted";
     rate: string;
     status: "available" | "unavailable";
+    kycStatus: "pending" | "approved" | "rejected";
+    ipAddress?: string;
+    deviceId?: string;
     createdAt: string;
 }
 
@@ -50,6 +54,17 @@ export function saveProvider(record: ProviderRecord) {
 
 export function getProviders(): ProviderRecord[] {
     return Array.from(providersStore.values());
+}
+
+export function countProvidersByNetwork(ipAddress?: string, deviceId?: string): number {
+    let count = 0;
+    for (const record of providersStore.values()) {
+        if ((ipAddress && record.ipAddress === ipAddress) || 
+            (deviceId && record.deviceId === deviceId)) {
+            count++;
+        }
+    }
+    return count;
 }
 
 export function getCashRequest(id: string): CashRequestRecord | undefined {
@@ -81,6 +96,32 @@ export function getStoreStats() {
             released: requests.filter(r => r.status === "released").length,
             refunded: requests.filter(r => r.status === "refunded").length,
             disputed: requests.filter(r => r.status === "disputed").length,
+            pending_signature: requests.filter(r => r.status === "pending_signature").length,
         },
     };
+}
+
+export interface RecentActivityItem {
+    id: string;
+    status: CashRequestRecord["status"];
+    createdAt: string;
+}
+
+/**
+ * Sanitized feed of the most recent trades for the public status page.
+ *
+ * Deliberately omits seller/buyer addresses, amounts, and secret material —
+ * only the trade id (already public via /claim/:id links), its status, and
+ * its timestamp. This gives a rough sense of on-chain activity without
+ * letting anyone enumerate counterparty addresses or trade sizes.
+ *
+ * Kept separate from getStoreStats() above: that one is for internal/admin
+ * metrics (aggregate counts, behind ADMIN_API_KEY), this one is the public
+ * transparency feed with no auth and no aggregate/sensitive fields.
+ */
+export function getRecentActivity(limit = 10): RecentActivityItem[] {
+    return Array.from(store.values())
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit)
+        .map(({ id, status, createdAt }) => ({ id, status, createdAt }));
 }

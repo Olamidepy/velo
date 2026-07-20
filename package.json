@@ -16,7 +16,8 @@
     "test": "turbo run test",
     "dev:api": "npm run dev -w apps/api",
     "dev:frontend": "npm run dev -w mobile/frontend",
-    "dev:backend": "npm run dev -w mobile/backend"
+    "dev:backend": "npm run dev -w mobile/backend",
+    "post-deploy-check": "npm run post-deploy-check -w apps/api"
   },
   "devDependencies": {
     "turbo": "^2.1.0"

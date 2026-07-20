@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { refundEscrow, resolveEscrow } from "../lib/stellar.js"; // Assuming stellar.ts exports refundEscrow
 import { getCashRequest, updateStatus, getAllCashRequests } from "../lib/store.js";
+import { refundEscrow } from "../lib/stellar.js"; // Assuming stellar.ts exports refundEscrow
+import { getCashRequest, updateStatus, getStoreStats } from "../lib/store.js";
 
 // Basic schema for body validation
 interface FlagRequestBody {
@@ -12,10 +14,26 @@ interface OverrideHeader {
   'x-admin-api-key': string;
 }
 
+// Basic schema for body validation
+interface FlagRequestBody {
+  suspicious: boolean;
+  notes?: string;
+}
+
+interface OverrideHeader {
+  'x-admin-api-key': string;
+}
+
+// Basic schema for body validation
+interface FlagRequestBody {
+  suspicious: boolean;
+  notes?: string;
+}
+
+interface OverrideHeader {
+  'x-admin-api-key': string;
+}
 export async function adminRoutes(app: FastifyInstance) {
-  
-  // --- AUTHENTICATION PRE-HANDLER ---
-  // Secures all routes registered under this plugin
   app.addHook("preHandler", async (req: FastifyRequest, reply: FastifyReply) => {
     const adminKey = req.headers["x-admin-api-key"];
     const expectedKey = process.env.ADMIN_API_KEY;
@@ -31,8 +49,7 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   /**
-   * GET /admin/trades
-   * Acceptance Criteria: Authenticated listing of all trades with status, amounts, and timestamps
+   * GET /admin/stats — store-level statistics (in-memory replacement for DB query).
    */
   app.get(
     "/admin/trades",
@@ -148,44 +165,46 @@ export async function adminRoutes(app: FastifyInstance) {
       }
     }
   );
+  app.get("/admin/stats", async (_req, reply) => {
+    return reply.status(200).send(getStoreStats());
+  });
 
   /**
-   * POST /admin/trades/:id/refund
-   * Acceptance Criteria: Manually trigger a refund call for a stuck trade past its timeout
+   * POST /admin/trades/:id/refund — manually trigger a refund for a stuck trade.
    */
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: { signed_xdr?: string } }>(
     "/admin/trades/:id/refund",
     async (req, reply) => {
       const { id } = req.params;
       const operatorName = req.headers["x-admin-operator-name"] || "System Admin";
 
-      // 1. Check local state store for validity
       const record = getCashRequest(id);
       if (!record) {
         return reply.status(404).send({ error: "Trade request not found." });
       }
 
       if (record.status !== "locked") {
-        return reply.status(400).send({ 
-          error: `Cannot refund. Only locked trades can be refunded. Current status is '${record.status}'.` 
+        return reply.status(400).send({
+          error: `Cannot refund. Only locked trades can be refunded. Current status is '${record.status}'.`,
         });
       }
 
-      // 2. Perform the on-chain manual refund override using Stellar SDK
       try {
-        req.log.warn(`Manual refund initiated on-chain for trade ID ${id} by ${operatorName}`);
-        
-        await refundEscrow({
-          contractId: record.contractId,
-          tradeId: record.id,
-          // Stellar contract will internally enforce the timeline check (stuck trade past timeout ledgers)
-        });
+        req.log.warn(`Manual refund initiated for trade ID ${id} by ${operatorName}`);
 
+        if (req.body?.signed_xdr) {
+          await submitRefundTx(req.body.signed_xdr);
+        } else {
+          await refundEscrow({
+            contractId: record.contractId,
+            tradeId: record.id,
+          });
+        }
       } catch (err) {
-        req.log.error(err, "refundEscrow on-chain call failed during admin override");
-        return reply.status(502).send({ 
-          error: "On-chain refund execution failed", 
-          detail: String(err) 
+        req.log.error(err, "refund on-chain call failed during admin override");
+        return reply.status(502).send({
+          error: "On-chain refund execution failed",
+          detail: String(err),
         });
       }
 
@@ -213,14 +232,15 @@ export async function adminRoutes(app: FastifyInstance) {
           trade_id: id,
           new_status: "refunded"
         });
+      updateStatus(id, "refunded");
+      notifyTradeStatus(id, "refunded");
 
-      } catch (dbErr) {
-        req.log.error(dbErr, "On-chain transaction succeeded, but internal database sync failed");
-        return reply.status(500).send({ 
-          error: "Refund successful on-chain, but local database status sync failed. Manual sync needed.",
-          trade_id: id
-        });
-      }
+      return reply.status(200).send({
+        status: "success",
+        message: "Manual refund processed successfully.",
+        trade_id: id,
+        new_status: "refunded",
+      });
     }
   );
 
@@ -316,4 +336,13 @@ export async function adminRoutes(app: FastifyInstance) {
       }
     }
   );
+  app.get("/admin/status", async (req, reply) => {
+    return {
+      ok: true,
+      version: "0.1.0",
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      store: getStoreStats(),
+    };
+  });
 }
